@@ -32,7 +32,7 @@ class App extends Component {
           lng: position.coords.longitude
         },
         haveUsersLocation: true,
-        zoom: 13;
+        zoom: 13
       });
     }, () => {
       console.log("oops no location given");
@@ -46,7 +46,7 @@ class App extends Component {
               lng: location.longitude
             },
             haveUsersLocation: true,
-            zoom: 13;
+            zoom: 13
           });
         })
     });
