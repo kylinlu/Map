@@ -1,18 +1,24 @@
 import React, { Component } from 'react';
+import Joi from '@hapi/joi';
 import L from 'leaflet';
 import { Map, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Card, Button, CardTitle, CardText } from 'reactstrap';
+import { Card, Button, CardTitle, CardText, Form, FormGroup, Label, Input } from 'reactstrap';
+
 import './App.css';
 
 var myIcon = L.icon({
     iconUrl: 'my-icon.png',
     iconSize: [38, 95],
     iconAnchor: [22, 94],
-    popupAnchor: [-3, -76],
-    shadowUrl: 'my-icon-shadow.png',
-    shadowSize: [68, 95],
-    shadowAnchor: [22, 94]
+    popupAnchor: [-3, -76]
 });
+
+const schema = Joi.object().keys({
+    name: Joi.string().min(1).max(500).required(),
+    message: Joi.string().alphanum().min(5).max(500).required()
+});
+
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api/v1/messages' : 'production_url';
 
 class App extends Component {
   state = {
@@ -22,6 +28,10 @@ class App extends Component {
     },
     haveUsersLocation: false,
     zoom: 2,
+    userMessage: {
+    	name: '',
+    	message: ''
+    }
   }
 
   componentDidMount() {
@@ -52,6 +62,48 @@ class App extends Component {
     });
   }
 
+  formIsValid = () => {
+    const userMessage = {
+      name: this.state.userMessage.name,
+      message: this.state.userMessage.message
+    };
+    const result = Joi.validate(userMessage, schema);
+
+    return !result.error && this.state.haveUsersLocation ? true: false;
+  }
+
+  formSubmitted = (event) => {
+  	event.preventDefault();
+    
+    if (this.formIsValid) {
+      fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: this.state.userMessage.name,
+          message: this.state.userMessage.message,
+          latitude: this.state.location.lat,
+          longitude: this.state.location.lng
+        })
+      }).then(res => res.json())
+      .then(message => {
+        console.log(message);
+      });
+    }
+  }
+
+  valueChanged = (event) => {
+  	const { name, value } = event.target;
+  	this.setState((prevState) => ({
+  		userMessage: {
+  			...prevState.userMessage,
+  			[name]: value
+  		}
+  	}))
+  }
+
   render() {
     const position = [this.state.location.lat, this.state.location.lng];
     return (
@@ -70,9 +122,29 @@ class App extends Component {
           }
         </Map>
         <Card body className="message-form">
-          <CardTitle>Special Title Treatment</CardTitle>
-          <CardText>With supporting text below as a natural lead-in to additional content.</CardText>
-          <Button>Go somewhere</Button>
+          <CardTitle>welcome to GuestMap</CardTitle>
+          <CardText>Leave a message with your location lol</CardText>
+          <Form onSubmit={this.formSubmitted}>
+          	<FormGroup>
+          		<Label for="name">Name</Label>
+          		<Input 
+          			onChange={this.valueChanged}
+	          		type="text" 
+	          		name="name" 
+	          		id="name" 
+	          		placeholder="Enter your name" />
+          	</FormGroup>
+          	<FormGroup>
+          		<Label for="message">Message</Label>
+          		<Input 
+          			onChange={this.valueChanged}
+	          		type="textarea" 
+	          		name="message" 
+	          		id="message" 
+	          		placeholder="Enter a message" />
+          	</FormGroup>
+          	<Button type="submit" color="info" disabled={!this.formIsValid()}>Send</Button>
+          </Form>
         </Card>
       </div>
     );
