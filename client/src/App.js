@@ -2,32 +2,28 @@ import React, { Component } from 'react';
 import Joi from '@hapi/joi';
 import L from 'leaflet';
 import { Map, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Card, Button, CardTitle, CardText, Form, FormGroup, Label, Input } from 'reactstrap';
 import userLocationURL from './user_location.svg'
 import messageLocationURL from './message_location.svg'
+
+import MessageCard from './MessageCard';
+import { getMessages, getLocation, sendingMessage } from './API';
 
 import './App.css';
 
 var myIcon = L.icon({
     iconUrl: userLocationURL,
-    iconSize: [38, 95],
-    iconAnchor: [0, 94],
-    popupAnchor: [25, -76]
+    iconSize: [38, 95]
 });
 
 var myIcon = L.icon({
     iconUrl: messageLocationURL,
-    iconSize: [38, 95],
-    iconAnchor: [0, 94],
-    popupAnchor: [25, -76]
+    iconSize: [38, 95]
 });
 
 const schema = Joi.object().keys({
     name: Joi.string().min(1).max(500).required(),
     message: Joi.string().alphanum().min(5).max(500).required()
 });
-
-const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api/v1/messages' : 'production_url';
 
 class App extends Component {
   state = {
@@ -47,50 +43,21 @@ class App extends Component {
   }
 
   componentDidMount() {
-    fetch(API_URL)
-      .then(res => res.json())
+    getMessages()
       .then(messages => {
-        const haveSeenLocation = {};
-        messages = messages.reduce((all, message) => {
-          const key = `${message.latitude}${message.longitude}`;
-          if (haveSeenLocation[key]) {
-            haveSeenLocation[key].otherMessages = haveSeenLocation[key].otherMessages || [];
-            haveSeenLocation[key].otherMessages.push(message);
-          } else {
-            haveSeenLocation[key] = message;
-            all.push(message);
-          }
-          return all;
-        }, []);
         this.setState({
           messages
         });
       });
-    navigator.geolocation.getCurrentPosition((position) => {
-      this.setState({
-        location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        },
-        haveUsersLocation: true,
-        zoom: 13
-      });
-    }, () => {
-      console.log("oops no location given");
-      fetch('https://ipapi.co/json')
-        .then(res => res.json())
+
+      getLocation()
         .then(location => {
-          console.log(location);
           this.setState({
-            location: {
-              lat: location.latitude,
-              lng: location.longitude
-            },
+            location,
             haveUsersLocation: true,
             zoom: 13
           });
-        })
-    });
+        });
   }
 
   formIsValid = () => {
@@ -112,27 +79,24 @@ class App extends Component {
       this.setState({
         sendingMessage: true
       });
-      fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
+
+      const message = {
           name: this.state.userMessage.name,
           message: this.state.userMessage.message,
           latitude: this.state.location.lat,
           longitude: this.state.location.lng
-        })
-      }).then(res => res.json())
-      .then(message => {
-        console.log(message);
+        };
+
+        sendingMessage(message)
+          .then((result) => {
         setTimeout(() => {
           this.setState({
             sendingMessage: false,
             sentMessage: true
           });
         }, 1000);
-      });
+          });
+      }
     }
   }
 
@@ -174,37 +138,14 @@ class App extends Component {
           ))};
         }
         </Map>
-        <Card body className="message-form">
-          <CardTitle>welcome to GuestMap</CardTitle>
-          <CardText>Leave a message with your location lol</CardText>
-          { 
-            !this.state.sendingMessage && !this.state.sentMessage && this.state.haveUsersLocation?
-            <Form onSubmit={this.formSubmitted}>
-              <FormGroup>
-                <Label for="name">Name</Label>
-                <Input 
-                  onChange={this.valueChanged}
-                  type="text" 
-                  name="name" 
-                  id="name" 
-                  placeholder="Enter your name" />
-              </FormGroup>
-              <FormGroup>
-                <Label for="message">Message</Label>
-                <Input 
-                  onChange={this.valueChanged}
-                  type="textarea" 
-                  name="message" 
-                  id="message" 
-                  placeholder="Enter a message" />
-              </FormGroup>
-              <Button type="submit" color="info" disabled={!this.formIsValid()}>Send</Button>
-            </Form> :
-            this.state.sendingMessage || !this.state.haveUsersLocation ?
-            <video autoPlay loop src="https://i.giphy.com/media/BCIRKxED2Y2JO/giphy.mp4"></video> :
-            <CardText>"Message submitted!"</CardText>
-          }
-        </Card>
+        <MessageCard
+          sendingMessage = {this.state.sendingMessage}
+          sentMessage = {this.state.sentMessage}
+          haveUsersLocation = {this.state.haveUsersLocation}
+          formSubmitted = {this.state.formSubmitted}
+          valueChanged = {this.state.valueChanged}
+          formIsValid = {this.state.formIsValid}
+        />
       </div>
     );
   }
